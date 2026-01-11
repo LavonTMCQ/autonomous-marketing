@@ -21,6 +21,11 @@ const {
   generateStoryboardShots,
   generateKeyframesForShots,
   generateClipsForShots,
+  generateKeyframeForShot,
+  generateClipForShot,
+  applyKeyframeVersion,
+  applyClipVersion,
+  ensureShotHistory,
   exportProjectVideo,
 } = require('./src/core/pipeline');
 
@@ -86,6 +91,21 @@ app.post('/api/projects/:id/storyboard', (req, res) => {
   res.json({ shots: project.shots });
 });
 
+app.post('/api/projects/:id/settings', (req, res) => {
+  const project = loadProject(req.params.id);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  if (req.body.selected_style_pack_id !== undefined) {
+    project.selected_style_pack_id = req.body.selected_style_pack_id || null;
+  }
+  if (req.body.continuity_mode) {
+    project.continuity_mode = req.body.continuity_mode;
+  }
+  saveProject(project);
+  res.json(project);
+});
+
 app.post('/api/projects/:id/keyframes', async (req, res) => {
   const project = loadProject(req.params.id);
   if (!project) {
@@ -104,6 +124,95 @@ app.post('/api/projects/:id/clips', async (req, res) => {
   const updated = await generateClipsForShots(project);
   saveProject(updated);
   res.json({ shots: updated.shots });
+});
+
+app.post('/api/projects/:id/shots/:shotId/keyframe', async (req, res) => {
+  const project = loadProject(req.params.id);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  const shotIndex = project.shots.findIndex((item) => item.id === req.params.shotId);
+  if (shotIndex === -1) {
+    return res.status(404).json({ error: 'Shot not found' });
+  }
+  const shot = project.shots[shotIndex];
+  await generateKeyframeForShot({ project, shot });
+  saveProject(project);
+  res.json({ project, shot });
+});
+
+app.post('/api/projects/:id/shots/:shotId/clip', async (req, res) => {
+  const project = loadProject(req.params.id);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  const shotIndex = project.shots.findIndex((item) => item.id === req.params.shotId);
+  if (shotIndex === -1) {
+    return res.status(404).json({ error: 'Shot not found' });
+  }
+  const shot = project.shots[shotIndex];
+  const previousShot = project.shots[shotIndex - 1];
+  await generateClipForShot({ project, shot, previousShot });
+  saveProject(project);
+  res.json({ project, shot });
+});
+
+app.post('/api/projects/:id/shots/:shotId/regenerate', async (req, res) => {
+  const project = loadProject(req.params.id);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  const shotIndex = project.shots.findIndex((item) => item.id === req.params.shotId);
+  if (shotIndex === -1) {
+    return res.status(404).json({ error: 'Shot not found' });
+  }
+  const shot = project.shots[shotIndex];
+  const mode = req.body?.mode || 'both';
+  if (mode === 'keyframe' || mode === 'both') {
+    await generateKeyframeForShot({ project, shot });
+  }
+  if (mode === 'clip' || mode === 'both') {
+    const previousShot = project.shots[shotIndex - 1];
+    await generateClipForShot({ project, shot, previousShot });
+  }
+  saveProject(project);
+  res.json({ project, shot });
+});
+
+app.post('/api/projects/:id/shots/:shotId/rollback', (req, res) => {
+  const project = loadProject(req.params.id);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  const shot = project.shots.find((item) => item.id === req.params.shotId);
+  if (!shot) {
+    return res.status(404).json({ error: 'Shot not found' });
+  }
+  ensureShotHistory(shot);
+  const asset = req.body?.asset;
+  const version = Number(req.body?.version);
+  if (!asset || Number.isNaN(version)) {
+    return res.status(400).json({ error: 'asset and version are required' });
+  }
+
+  if (asset === 'keyframe') {
+    const entry = shot.keyframe_versions.find((item) => item.version === version);
+    if (!entry) {
+      return res.status(404).json({ error: 'Keyframe version not found' });
+    }
+    applyKeyframeVersion(shot, entry);
+  } else if (asset === 'clip') {
+    const entry = shot.clip_versions.find((item) => item.version === version);
+    if (!entry) {
+      return res.status(404).json({ error: 'Clip version not found' });
+    }
+    applyClipVersion(shot, entry);
+  } else {
+    return res.status(400).json({ error: 'Invalid asset type' });
+  }
+
+  saveProject(project);
+  res.json({ project, shot });
 });
 
 app.post('/api/projects/:id/export', async (req, res) => {

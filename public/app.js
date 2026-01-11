@@ -72,11 +72,17 @@ const refreshStylePacks = async () => {
   state.stylepacks = data.stylepacks || [];
   const select = qs('#stylePackSelect');
   select.innerHTML = '<option value="">None</option>';
+  const activeSelect = qs('#activeStylePack');
+  activeSelect.innerHTML = '<option value="">None</option>';
   state.stylepacks.forEach((pack) => {
     const option = document.createElement('option');
     option.value = pack.pack_id;
     option.textContent = pack.name;
     select.appendChild(option);
+    const activeOption = document.createElement('option');
+    activeOption.value = pack.pack_id;
+    activeOption.textContent = pack.name;
+    activeSelect.appendChild(activeOption);
   });
 
   const list = qs('#stylePackList');
@@ -87,6 +93,16 @@ const refreshStylePacks = async () => {
     option.textContent = pack.name;
     list.appendChild(option);
   });
+
+  if (state.project) {
+    syncProjectSettingsUI();
+  }
+};
+
+const syncProjectSettingsUI = () => {
+  if (!state.project) return;
+  qs('#activeStylePack').value = state.project.selected_style_pack_id || '';
+  qs('#continuityMode').value = state.project.continuity_mode || 'bridging';
 };
 
 const loadStylePackDetails = async (packId) => {
@@ -103,6 +119,20 @@ const loadStylePackDetails = async (packId) => {
   )}`;
 };
 
+const buildVersionOptions = (versions, currentVersion) => {
+  if (!versions.length) {
+    return '<option value="">No versions yet</option>';
+  }
+  return versions
+    .map(
+      (entry) =>
+        `<option value="${entry.version}" ${
+          entry.version === currentVersion ? 'selected' : ''
+        }>v${entry.version} · ${new Date(entry.created_at).toLocaleString()}</option>`
+    )
+    .join('');
+};
+
 const renderShotTable = () => {
   const container = qs('#shotTable');
   container.innerHTML = '';
@@ -111,15 +141,39 @@ const renderShotTable = () => {
     return;
   }
   state.project.shots.forEach((shot) => {
-    const row = document.createElement('div');
-    row.className = 'table-row';
-    row.innerHTML = `
-      <div>#${shot.order}</div>
-      <input value="${shot.keyframe_prompt}" data-shot="${shot.id}" data-field="keyframe_prompt" />
-      <input value="${shot.duration_sec}" data-shot="${shot.id}" data-field="duration_sec" />
-      <input value="${shot.on_screen_text || ''}" data-shot="${shot.id}" data-field="on_screen_text" />
+    const card = document.createElement('div');
+    card.className = 'shot-card';
+    const keyframeVersions = shot.keyframe_versions || [];
+    const clipVersions = shot.clip_versions || [];
+    card.innerHTML = `
+      <div class="shot-fields">
+        <div>#${shot.order}</div>
+        <input value="${shot.keyframe_prompt}" data-shot="${shot.id}" data-field="keyframe_prompt" />
+        <input value="${shot.duration_sec}" data-shot="${shot.id}" data-field="duration_sec" />
+        <input value="${shot.on_screen_text || ''}" data-shot="${shot.id}" data-field="on_screen_text" />
+      </div>
+      <div class="shot-actions">
+        <div class="action-buttons">
+          <button class="secondary" data-action="regen-keyframe" data-shot="${shot.id}">Regenerate keyframe</button>
+          <button class="secondary" data-action="regen-clip" data-shot="${shot.id}">Regenerate clip</button>
+          <button class="primary" data-action="regen-both" data-shot="${shot.id}">Regenerate both</button>
+        </div>
+        <div class="shot-meta">
+          <span>Keyframes v${shot.keyframe_version || 0}</span>
+          <select class="version-select" data-asset="keyframe" data-shot="${shot.id}">
+            ${buildVersionOptions(keyframeVersions, shot.keyframe_version)}
+          </select>
+          <button class="secondary" data-action="rollback-keyframe" data-shot="${shot.id}">Rollback</button>
+          <span>Clips v${shot.clip_version || 0}</span>
+          <select class="version-select" data-asset="clip" data-shot="${shot.id}">
+            ${buildVersionOptions(clipVersions, shot.clip_version)}
+          </select>
+          <button class="secondary" data-action="rollback-clip" data-shot="${shot.id}">Rollback</button>
+        </div>
+        <div>Keyframe: ${shot.status?.keyframe_status || 'pending'} · Clip: ${shot.status?.clip_status || 'pending'}</div>
+      </div>
     `;
-    row.querySelectorAll('input').forEach((input) => {
+    card.querySelectorAll('input').forEach((input) => {
       input.addEventListener('change', (event) => {
         const field = event.target.dataset.field;
         const shotId = event.target.dataset.shot;
@@ -127,7 +181,7 @@ const renderShotTable = () => {
         targetShot[field] = field === 'duration_sec' ? Number(event.target.value) : event.target.value;
       });
     });
-    container.appendChild(row);
+    container.appendChild(card);
   });
 };
 
@@ -175,9 +229,21 @@ qs('#createProject').addEventListener('click', async () => {
     aspect_ratio: qs('#aspectRatio').value,
     target_duration: Number(qs('#targetDuration').value),
     selected_style_pack_id: qs('#stylePackSelect').value || null,
+    continuity_mode: qs('#continuityMode').value || 'bridging',
   };
   state.project = await api.post('/api/projects', payload);
   updateProjectUI();
+  syncProjectSettingsUI();
+});
+
+qs('#saveProjectSettings').addEventListener('click', async () => {
+  if (!state.project) return;
+  const payload = {
+    selected_style_pack_id: qs('#activeStylePack').value || null,
+    continuity_mode: qs('#continuityMode').value || 'bridging',
+  };
+  state.project = await api.post(`/api/projects/${state.project.id}/settings`, payload);
+  syncProjectSettingsUI();
 });
 
 qs('#saveBrandKit').addEventListener('click', async () => {
@@ -228,6 +294,7 @@ qs('#generateClips').addEventListener('click', async () => {
   const result = await api.post(`/api/projects/${state.project.id}/clips`, {});
   state.project.shots = result.shots;
   updateClipStatus();
+  renderShotTable();
 });
 
 qs('#exportVideo').addEventListener('click', async () => {
@@ -238,6 +305,44 @@ qs('#exportVideo').addEventListener('click', async () => {
   const result = await api.post(`/api/projects/${state.project.id}/export`, payload);
   state.project = result.project;
   updateExportStatus();
+});
+
+qs('#shotTable').addEventListener('click', async (event) => {
+  const button = event.target.closest('button[data-action]');
+  if (!button || !state.project) return;
+  const shotId = button.dataset.shot;
+  const action = button.dataset.action;
+  if (!shotId) return;
+
+  if (action === 'regen-keyframe') {
+    const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/regenerate`, {
+      mode: 'keyframe',
+    });
+    state.project = result.project;
+  } else if (action === 'regen-clip') {
+    const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/regenerate`, {
+      mode: 'clip',
+    });
+    state.project = result.project;
+  } else if (action === 'regen-both') {
+    const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/regenerate`, {
+      mode: 'both',
+    });
+    state.project = result.project;
+  } else if (action === 'rollback-keyframe' || action === 'rollback-clip') {
+    const asset = action === 'rollback-keyframe' ? 'keyframe' : 'clip';
+    const select = qs(`select[data-asset="${asset}"][data-shot="${shotId}"]`);
+    const version = Number(select?.value);
+    if (!version) return;
+    const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/rollback`, {
+      asset,
+      version,
+    });
+    state.project = result.project;
+  }
+
+  renderShotTable();
+  updateClipStatus();
 });
 
 qs('#createStylePack').addEventListener('click', async () => {

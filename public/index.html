@@ -60,6 +60,23 @@
                   </label>
                 </div>
                 <button class="primary" id="createProject">Create Project</button>
+                <div class="divider"></div>
+                <h4>Active Project Controls</h4>
+                <div class="grid">
+                  <label>
+                    Active Style Pack
+                    <select id="activeStylePack"></select>
+                  </label>
+                  <label>
+                    Continuity mode
+                    <select id="continuityMode">
+                      <option value="bridging">Bridging (first + last frame)</option>
+                      <option value="last-frame">Last-frame chaining</option>
+                      <option value="independent">Independent shots</option>
+                    </select>
+                  </label>
+                </div>
+                <button class="secondary" id="saveProjectSettings">Save Project Settings</button>
               </section>
 
               <section class="step-panel" data-step="1">

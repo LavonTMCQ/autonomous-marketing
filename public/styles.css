@@ -170,19 +170,51 @@ button.secondary {
   gap: 12px;
 }
 
-.table-row {
+.shot-card {
   display: grid;
-  grid-template-columns: 60px 1fr 120px 120px;
   gap: 12px;
-  align-items: center;
   padding: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #fafafa;
 }
 
-.table-row input {
+.shot-fields {
+  display: grid;
+  grid-template-columns: 60px 1fr 120px 140px;
+  gap: 12px;
+  align-items: center;
+}
+
+.shot-fields input {
   width: 100%;
+}
+
+.shot-actions {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.shot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.shot-meta span {
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.version-select {
+  min-width: 140px;
 }
 
 .status-list {
@@ -222,6 +254,12 @@ button.secondary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+}
+
+.divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
 }
 
 @media (max-width: 900px) {

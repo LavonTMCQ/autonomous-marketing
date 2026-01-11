@@ -16,14 +16,29 @@ const extractLastFrame = (clipPath, outputPath) => {
 };
 
 class ContinuityManager {
-  constructor({ supportsFirstLast } = {}) {
+  constructor({ supportsFirstLast, mode } = {}) {
     this.supportsFirstLast = supportsFirstLast || false;
+    this.mode = mode || 'bridging';
   }
 
   resolveFrames({ previousShot, currentShot }) {
+    if (this.mode === 'independent') {
+      return {
+        firstFramePath: currentShot.keyframe_image_path,
+        targetLastFramePath: null,
+      };
+    }
+
     if (!previousShot) {
       return {
         firstFramePath: currentShot.keyframe_image_path,
+        targetLastFramePath: null,
+      };
+    }
+
+    if (this.mode === 'last-frame') {
+      return {
+        firstFramePath: previousShot.continuity?.last_frame_path || previousShot.keyframe_image_path,
         targetLastFramePath: null,
       };
     }

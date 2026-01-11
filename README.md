@@ -7,6 +7,9 @@ A beginner-friendly local web app that turns a short brief into a storyboard, ke
 - Local project persistence with reproducible `project.json` and deterministic asset paths.
 - Style Packs: add example videos, extract reference frames + metadata, and apply a prompt spine across generations.
 - Provider adapters (image + video) are swappable via config and environment variables.
+- Per-shot regeneration controls (keyframe only, clip only, or both) with version history and rollback.
+- Continuity modes (bridging, last-frame chaining, independent shots) to tune cohesion behavior.
+- Style Pack swapping for existing projects without restarting the workflow.
 
 ## Quickstart (Beginner)
 1. Install dependencies:

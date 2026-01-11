@@ -13,6 +13,7 @@ const defaultProject = (id, input) => {
     fps_target: 30,
     target_duration: input?.target_duration || 30,
     selected_style_pack_id: input?.selected_style_pack_id || null,
+    continuity_mode: input?.continuity_mode || 'bridging',
     brand_kit: {
       colors: [],
       logo_path: null,
