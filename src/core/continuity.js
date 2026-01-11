@@ -2,15 +2,24 @@ const path = require('path');
 const fs = require('fs');
 const { hasFfmpeg, runFfmpeg } = require('../utils/ffmpeg');
 
+const placeholderPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGD4DwABBAEAkS8hNwAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+const writePlaceholderPng = (outputPath) => {
+  fs.writeFileSync(outputPath, placeholderPng);
+};
+
 const extractLastFrame = (clipPath, outputPath) => {
   if (!hasFfmpeg()) {
-    fs.writeFileSync(outputPath, 'placeholder last frame');
+    writePlaceholderPng(outputPath);
     return outputPath;
   }
   const args = ['-y', '-sseof', '-0.1', '-i', clipPath, '-vframes', '1', outputPath];
   const result = runFfmpeg(args);
   if (!result.ok) {
-    fs.writeFileSync(outputPath, 'placeholder last frame');
+    writePlaceholderPng(outputPath);
   }
   return outputPath;
 };

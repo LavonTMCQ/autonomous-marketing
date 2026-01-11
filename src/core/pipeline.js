@@ -201,6 +201,7 @@ const exportProjectVideo = async (project, options) => {
   const exportDir = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'exports');
   const filename = `final_v${project.exports.length + 1}.mp4`;
   const outputPath = path.join(exportDir, filename);
+  let warning = null;
 
   const clipPaths = project.shots.map((shot) => shot.clip_path).filter(Boolean);
   if (!clipPaths.length) {
@@ -214,18 +215,21 @@ const exportProjectVideo = async (project, options) => {
     const result = runFfmpeg(args);
     if (!result.ok) {
       fs.writeFileSync(outputPath, 'export placeholder');
+      warning = 'ffmpeg failed: wrote placeholder export';
     }
   } else {
     fs.writeFileSync(outputPath, 'export placeholder');
+    warning = 'ffmpeg missing: wrote placeholder export';
   }
 
   project.exports.push({
     path: outputPath,
     created_at: new Date().toISOString(),
     audio: options?.audio_path || null,
+    warning,
   });
 
-  return { project, outputPath };
+  return { project, outputPath, warning };
 };
 
 module.exports = {
