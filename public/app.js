@@ -18,6 +18,11 @@ const steps = [
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => Array.from(document.querySelectorAll(selector));
 
+const storage = {
+  getLastProjectId: () => window.localStorage.getItem('lastProjectId'),
+  setLastProjectId: (id) => window.localStorage.setItem('lastProjectId', id),
+};
+
 const api = {
   get: (path) => fetch(path).then((res) => res.json()),
   post: (path, body) =>
@@ -67,6 +72,25 @@ const updateProjectUI = () => {
   qs('#projectStatus').textContent = state.project ? `Project ${state.project.id}` : 'No project yet';
 };
 
+const applyProjectToForm = () => {
+  if (!state.project) return;
+  qs('#projectName').value = state.project.name || '';
+  qs('#aspectRatio').value = state.project.aspect_ratio || '16:9';
+  qs('#targetDuration').value = String(state.project.target_duration || 30);
+  qs('#continuityMode').value = state.project.continuity_mode || 'maintain';
+  qs('#stylePackSelect').value = state.project.selected_style_pack_id || '';
+};
+
+const setActiveProject = (project) => {
+  state.project = project;
+  updateProjectUI();
+  applyProjectToForm();
+  renderShotTable();
+  updateClipStatus();
+  updateExportStatus();
+  storage.setLastProjectId(project.id);
+};
+
 const refreshStylePacks = async () => {
   const data = await api.get('/api/stylepacks');
   state.stylepacks = data.stylepacks || [];
@@ -78,6 +102,9 @@ const refreshStylePacks = async () => {
     option.textContent = pack.name;
     select.appendChild(option);
   });
+  if (state.project?.selected_style_pack_id) {
+    select.value = state.project.selected_style_pack_id;
+  }
 
   const list = qs('#stylePackList');
   list.innerHTML = '';
@@ -158,11 +185,38 @@ const updateExportStatus = () => {
   });
 };
 
+const loadProjectById = async (projectId) => {
+  if (!projectId) return null;
+  const project = await api.get(`/api/projects/${projectId}`);
+  if (project?.error) return null;
+  return project;
+};
+
+const restoreLastProject = async () => {
+  const data = await api.get('/api/projects');
+  const projects = data.projects || [];
+  if (!projects.length) return;
+
+  const storedId = storage.getLastProjectId();
+  const storedProject = projects.find((project) => project.id === storedId);
+  const fallback = projects
+    .slice()
+    .sort((a, b) => b.last_updated.localeCompare(a.last_updated))[0];
+  const target = storedProject || fallback;
+  if (!target) return;
+
+  const project = await loadProjectById(target.id);
+  if (project) {
+    setActiveProject(project);
+  }
+};
+
 const init = async () => {
   renderSteps();
   setStep(0);
   setView('stepper');
   await refreshStylePacks();
+  await restoreLastProject();
 };
 
 qsa('.nav-btn').forEach((btn) => {
@@ -174,10 +228,11 @@ qs('#createProject').addEventListener('click', async () => {
     name: qs('#projectName').value || 'New Project',
     aspect_ratio: qs('#aspectRatio').value,
     target_duration: Number(qs('#targetDuration').value),
+    continuity_mode: qs('#continuityMode').value,
     selected_style_pack_id: qs('#stylePackSelect').value || null,
   };
-  state.project = await api.post('/api/projects', payload);
-  updateProjectUI();
+  const project = await api.post('/api/projects', payload);
+  setActiveProject(project);
 });
 
 qs('#saveBrandKit').addEventListener('click', async () => {
