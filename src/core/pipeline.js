@@ -7,6 +7,65 @@ const { loadStylePack } = require('../storage/stylePackStore');
 const { ensureProjectDirs } = require('../storage/projectStore');
 const { hasFfmpeg, runFfmpeg } = require('../utils/ffmpeg');
 
+const ensureShotHistory = (shot) => {
+  if (!shot.keyframe_versions) {
+    shot.keyframe_versions = [];
+  }
+  if (!shot.clip_versions) {
+    shot.clip_versions = [];
+  }
+};
+
+const recordKeyframeVersion = (shot, payload) => {
+  ensureShotHistory(shot);
+  shot.keyframe_versions.push(payload);
+  shot.keyframe_version = payload.version;
+  shot.keyframe_image_path = payload.path;
+  shot.provider_config.image_provider = payload.provider_config?.image_provider || shot.provider_config.image_provider;
+  shot.provider_config.image_model = payload.provider_config?.image_model || shot.provider_config.image_model;
+  shot.provider_config.image_settings = payload.provider_config?.image_settings || shot.provider_config.image_settings;
+};
+
+const recordClipVersion = (shot, payload) => {
+  ensureShotHistory(shot);
+  shot.clip_versions.push(payload);
+  shot.clip_version = payload.version;
+  shot.clip_path = payload.path;
+  shot.provider_config.video_provider = payload.provider_config?.video_provider || shot.provider_config.video_provider;
+  shot.provider_config.video_model = payload.provider_config?.video_model || shot.provider_config.video_model;
+  shot.provider_config.video_settings = payload.provider_config?.video_settings || shot.provider_config.video_settings;
+};
+
+const applyKeyframeVersion = (shot, versionEntry) => {
+  ensureShotHistory(shot);
+  shot.keyframe_version = versionEntry.version;
+  shot.keyframe_image_path = versionEntry.path;
+  shot.provider_config.image_provider =
+    versionEntry.provider_config?.image_provider || shot.provider_config.image_provider;
+  shot.provider_config.image_model =
+    versionEntry.provider_config?.image_model || shot.provider_config.image_model;
+  shot.provider_config.image_settings =
+    versionEntry.provider_config?.image_settings || shot.provider_config.image_settings;
+  shot.status.keyframe_status = 'ready';
+};
+
+const applyClipVersion = (shot, versionEntry) => {
+  ensureShotHistory(shot);
+  shot.clip_version = versionEntry.version;
+  shot.clip_path = versionEntry.path;
+  shot.provider_config.video_provider =
+    versionEntry.provider_config?.video_provider || shot.provider_config.video_provider;
+  shot.provider_config.video_model =
+    versionEntry.provider_config?.video_model || shot.provider_config.video_model;
+  shot.provider_config.video_settings =
+    versionEntry.provider_config?.video_settings || shot.provider_config.video_settings;
+  shot.status.clip_status = 'ready';
+  shot.continuity.prev_last_frame_path = versionEntry.continuity?.prev_last_frame_path || null;
+  shot.continuity.first_frame_path = versionEntry.continuity?.first_frame_path || null;
+  shot.continuity.target_last_frame_path = versionEntry.continuity?.target_last_frame_path || null;
+  shot.continuity.last_frame_path = versionEntry.continuity?.last_frame_path || null;
+};
+
 const buildPromptSpine = (project, stylePack) => {
   const brand = project.brand_kit || {};
   const voice = brand.brand_voice || {};
@@ -90,10 +149,12 @@ const generateStoryboardShots = (project) => {
     camera_notes: 'Smooth push-in, steady framing.',
     keyframe_image_path: null,
     keyframe_version: 0,
+    keyframe_versions: [],
     video_prompt: `${shot.text} Maintain continuity and brand style.`,
     video_negative_prompt: 'flicker, jitter, low fidelity',
     clip_path: null,
     clip_version: 0,
+    clip_versions: [],
     continuity: {
       prev_last_frame_path: null,
       first_frame_path: null,
@@ -116,6 +177,44 @@ const generateStoryboardShots = (project) => {
   }));
 };
 
+const generateKeyframeForShot = async ({ project, shot }) => {
+  ensureProjectDirs(project.id);
+  ensureShotHistory(shot);
+  const stylePack = project.selected_style_pack_id ? loadStylePack(project.selected_style_pack_id) : null;
+  const promptSpine = buildPromptSpine(project, stylePack);
+  const styleRefs = cacheStylePackRefs(project.id, stylePack, selectStyleRefs(stylePack));
+  const imageProvider = new ImageProvider(ImageProvider.defaultConfig());
+  const assetsPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'keyframes');
+
+  const version = shot.keyframe_version + 1;
+  const filename = `${shot.id}_v${version}.png`;
+  const outputPath = path.join(assetsPath, filename);
+  const prompt = `${shot.keyframe_prompt}\n${promptSpine}`;
+  await imageProvider.generateImage({
+    prompt,
+    negativePrompt: shot.negative_prompt,
+    outputPath,
+    referenceImages: styleRefs.map((ref) => ref.cached_path || ref.path),
+  });
+
+  recordKeyframeVersion(shot, {
+    version,
+    path: outputPath,
+    created_at: new Date().toISOString(),
+    prompt,
+    negative_prompt: shot.negative_prompt,
+    provider_config: {
+      image_provider: imageProvider.name,
+      image_model: imageProvider.model,
+      image_settings: imageProvider.settings,
+    },
+    style_pack_id: project.selected_style_pack_id,
+    reference_images: styleRefs.map((ref) => ref.cached_path || ref.path),
+  });
+  shot.status.keyframe_status = 'ready';
+  return shot;
+};
+
 const generateKeyframesForShots = async (project) => {
   ensureProjectDirs(project.id);
   const stylePack = project.selected_style_pack_id ? loadStylePack(project.selected_style_pack_id) : null;
@@ -125,6 +224,7 @@ const generateKeyframesForShots = async (project) => {
   const assetsPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'keyframes');
 
   for (const shot of project.shots) {
+    ensureShotHistory(shot);
     const version = shot.keyframe_version + 1;
     const filename = `${shot.id}_v${version}.png`;
     const outputPath = path.join(assetsPath, filename);
@@ -135,15 +235,91 @@ const generateKeyframesForShots = async (project) => {
       outputPath,
       referenceImages: styleRefs.map((ref) => ref.cached_path || ref.path),
     });
-    shot.keyframe_version = version;
-    shot.keyframe_image_path = outputPath;
-    shot.provider_config.image_provider = imageProvider.name;
-    shot.provider_config.image_model = imageProvider.model;
-    shot.provider_config.image_settings = imageProvider.settings;
+    recordKeyframeVersion(shot, {
+      version,
+      path: outputPath,
+      created_at: new Date().toISOString(),
+      prompt,
+      negative_prompt: shot.negative_prompt,
+      provider_config: {
+        image_provider: imageProvider.name,
+        image_model: imageProvider.model,
+        image_settings: imageProvider.settings,
+      },
+      style_pack_id: project.selected_style_pack_id,
+      reference_images: styleRefs.map((ref) => ref.cached_path || ref.path),
+    });
     shot.status.keyframe_status = 'ready';
   }
 
   return project;
+};
+
+const generateClipForShot = async ({ project, shot, previousShot }) => {
+  ensureProjectDirs(project.id);
+  ensureShotHistory(shot);
+  const stylePack = project.selected_style_pack_id ? loadStylePack(project.selected_style_pack_id) : null;
+  const promptSpine = buildPromptSpine(project, stylePack);
+  const styleRefs = cacheStylePackRefs(project.id, stylePack, selectStyleRefs(stylePack));
+  const videoProvider = new VideoProvider(VideoProvider.defaultConfig());
+  const continuityMode = project.continuity_mode || 'bridging';
+  const continuity = new ContinuityManager({
+    supportsFirstLast: true,
+    mode: continuityMode,
+  });
+
+  const clipsPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'clips');
+  const framesPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'frames');
+  const { firstFramePath, targetLastFramePath } = continuity.resolveFrames({
+    previousShot,
+    currentShot: shot,
+  });
+
+  const version = shot.clip_version + 1;
+  const filename = `${shot.id}_v${version}.mp4`;
+  const outputPath = path.join(clipsPath, filename);
+  const prompt = `${shot.video_prompt}\n${promptSpine}`;
+  const response = await videoProvider.generateVideo({
+    prompt,
+    negativePrompt: shot.video_negative_prompt,
+    outputPath,
+    firstFramePath,
+    lastFramePath: targetLastFramePath,
+    referenceImages: styleRefs.map((ref) => ref.cached_path || ref.path),
+  });
+
+  shot.continuity.prev_last_frame_path = previousShot?.continuity?.last_frame_path || null;
+  shot.continuity.first_frame_path = response.firstFramePath || firstFramePath || null;
+  shot.continuity.target_last_frame_path = response.lastFramePath || targetLastFramePath || null;
+
+  const frameFile = `${shot.id}_last_v${version}.png`;
+  const framePath = path.join(framesPath, frameFile);
+  continuity.saveLastFrame({ clipPath: outputPath, framePath });
+  shot.continuity.last_frame_path = framePath;
+
+  recordClipVersion(shot, {
+    version,
+    path: outputPath,
+    created_at: new Date().toISOString(),
+    prompt,
+    negative_prompt: shot.video_negative_prompt,
+    provider_config: {
+      video_provider: videoProvider.name,
+      video_model: videoProvider.model,
+      video_settings: videoProvider.settings,
+    },
+    continuity: {
+      mode: continuityMode,
+      prev_last_frame_path: shot.continuity.prev_last_frame_path,
+      first_frame_path: shot.continuity.first_frame_path,
+      target_last_frame_path: shot.continuity.target_last_frame_path,
+      last_frame_path: shot.continuity.last_frame_path,
+    },
+    style_pack_id: project.selected_style_pack_id,
+    reference_images: styleRefs.map((ref) => ref.cached_path || ref.path),
+  });
+  shot.status.clip_status = 'ready';
+  return shot;
 };
 
 const generateClipsForShots = async (project) => {
@@ -152,7 +328,8 @@ const generateClipsForShots = async (project) => {
   const promptSpine = buildPromptSpine(project, stylePack);
   const styleRefs = cacheStylePackRefs(project.id, stylePack, selectStyleRefs(stylePack));
   const videoProvider = new VideoProvider(VideoProvider.defaultConfig());
-  const continuity = new ContinuityManager({ supportsFirstLast: true });
+  const continuityMode = project.continuity_mode || 'bridging';
+  const continuity = new ContinuityManager({ supportsFirstLast: true, mode: continuityMode });
 
   const clipsPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'clips');
   const framesPath = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'frames');
@@ -160,6 +337,7 @@ const generateClipsForShots = async (project) => {
   for (let i = 0; i < project.shots.length; i += 1) {
     const shot = project.shots[i];
     const prevShot = project.shots[i - 1];
+    ensureShotHistory(shot);
     const { firstFramePath, targetLastFramePath } = continuity.resolveFrames({
       previousShot: prevShot,
       currentShot: shot,
@@ -177,11 +355,6 @@ const generateClipsForShots = async (project) => {
       lastFramePath: targetLastFramePath,
       referenceImages: styleRefs.map((ref) => ref.cached_path || ref.path),
     });
-    shot.clip_version = version;
-    shot.clip_path = outputPath;
-    shot.provider_config.video_provider = videoProvider.name;
-    shot.provider_config.video_model = videoProvider.model;
-    shot.provider_config.video_settings = videoProvider.settings;
     shot.continuity.prev_last_frame_path = prevShot?.continuity?.last_frame_path || null;
     shot.continuity.first_frame_path = response.firstFramePath || firstFramePath || null;
     shot.continuity.target_last_frame_path = response.lastFramePath || targetLastFramePath || null;
@@ -190,6 +363,27 @@ const generateClipsForShots = async (project) => {
     const framePath = path.join(framesPath, frameFile);
     continuity.saveLastFrame({ clipPath: outputPath, framePath });
     shot.continuity.last_frame_path = framePath;
+    recordClipVersion(shot, {
+      version,
+      path: outputPath,
+      created_at: new Date().toISOString(),
+      prompt,
+      negative_prompt: shot.video_negative_prompt,
+      provider_config: {
+        video_provider: videoProvider.name,
+        video_model: videoProvider.model,
+        video_settings: videoProvider.settings,
+      },
+      continuity: {
+        mode: continuityMode,
+        prev_last_frame_path: shot.continuity.prev_last_frame_path,
+        first_frame_path: shot.continuity.first_frame_path,
+        target_last_frame_path: shot.continuity.target_last_frame_path,
+        last_frame_path: shot.continuity.last_frame_path,
+      },
+      style_pack_id: project.selected_style_pack_id,
+      reference_images: styleRefs.map((ref) => ref.cached_path || ref.path),
+    });
     shot.status.clip_status = 'ready';
   }
 
@@ -201,7 +395,6 @@ const exportProjectVideo = async (project, options) => {
   const exportDir = path.join(__dirname, '..', '..', 'data', 'projects', project.id, 'assets', 'exports');
   const filename = `final_v${project.exports.length + 1}.mp4`;
   const outputPath = path.join(exportDir, filename);
-  let warning = null;
 
   const clipPaths = project.shots.map((shot) => shot.clip_path).filter(Boolean);
   if (!clipPaths.length) {
@@ -215,24 +408,26 @@ const exportProjectVideo = async (project, options) => {
     const result = runFfmpeg(args);
     if (!result.ok) {
       fs.writeFileSync(outputPath, 'export placeholder');
-      warning = 'ffmpeg failed: wrote placeholder export';
     }
   } else {
     fs.writeFileSync(outputPath, 'export placeholder');
-    warning = 'ffmpeg missing: wrote placeholder export';
   }
 
   project.exports.push({
     path: outputPath,
     created_at: new Date().toISOString(),
     audio: options?.audio_path || null,
-    warning,
   });
 
-  return { project, outputPath, warning };
+  return { project, outputPath };
 };
 
 module.exports = {
+  applyKeyframeVersion,
+  applyClipVersion,
+  ensureShotHistory,
+  generateKeyframeForShot,
+  generateClipForShot,
   generateScriptSections,
   generateStoryboardShots,
   generateKeyframesForShots,

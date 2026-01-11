@@ -59,6 +59,12 @@ body {
   border-radius: 12px;
 }
 
+.project-meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 main {
   padding: 32px;
 }
@@ -111,6 +117,36 @@ main {
   background: #eef2ff;
 }
 
+.step:disabled,
+.step.locked {
+  cursor: not-allowed;
+  color: #9ca3af;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.step-content {
+  position: relative;
+}
+
+.step-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  z-index: 1;
+}
+
+.step-overlay.active {
+  display: flex;
+}
+
 .step-panel {
   background: #fff;
   padding: 20px;
@@ -147,6 +183,16 @@ textarea {
   font-size: 14px;
 }
 
+.helper {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.inline-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
 button.primary {
   background: #4f46e5;
   color: #fff;
@@ -170,19 +216,51 @@ button.secondary {
   gap: 12px;
 }
 
-.table-row {
-  display: grid;
-  grid-template-columns: 60px 1fr 120px 120px;
-  gap: 12px;
-  align-items: center;
-  padding: 12px;
+.shot-card {
+  padding: 16px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #fafafa;
+  display: grid;
+  gap: 12px;
 }
 
-.table-row input {
+.shot-fields {
+  display: grid;
+  grid-template-columns: 60px 1fr 120px 140px;
+  gap: 12px;
+  align-items: center;
+}
+
+.shot-fields input {
   width: 100%;
+}
+
+.shot-actions {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.shot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.shot-meta span {
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.version-select {
+  min-width: 140px;
 }
 
 .status-list {
@@ -222,6 +300,12 @@ button.secondary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
+}
+
+.divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 24px 0;
 }
 
 @media (max-width: 900px) {

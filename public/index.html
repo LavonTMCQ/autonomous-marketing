@@ -17,6 +17,7 @@
         <div class="project-summary">
           <h3>Active Project</h3>
           <p id="activeProject">None</p>
+          <p id="activeProjectMeta" class="project-meta">Create a project to begin.</p>
         </div>
       </aside>
       <main>
@@ -31,9 +32,23 @@
           <div class="stepper">
             <div class="steps" id="steps"></div>
             <div class="step-content">
+              <div id="projectGate" class="step-overlay">
+                <div>
+                  <h4>Create a project first</h4>
+                  <p>Start with Step 1 to unlock the rest of the pipeline.</p>
+                </div>
+              </div>
               <section class="step-panel" data-step="0">
                 <h3>1. New Project</h3>
                 <div class="grid">
+                  <label>
+                    Resume project
+                    <select id="projectList"></select>
+                    <span class="helper">Pick an existing project to continue where you left off.</span>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="secondary" id="openProject">Open Project</button>
+                  </div>
                   <label>
                     Project name
                     <input id="projectName" type="text" placeholder="Launch video" />
@@ -55,18 +70,29 @@
                     </select>
                   </label>
                   <label>
-                    Continuity mode
-                    <select id="continuityMode">
-                      <option value="maintain">Maintain continuity</option>
-                      <option value="reset">Reset each clip</option>
-                    </select>
-                  </label>
-                  <label>
                     Style Pack
                     <select id="stylePackSelect"></select>
+                    <span class="helper">Applies a visual reference pack to guide the look of the video.</span>
                   </label>
                 </div>
                 <button class="primary" id="createProject">Create Project</button>
+                <div class="divider"></div>
+                <h4>Active Project Controls</h4>
+                <div class="grid">
+                  <label>
+                    Active Style Pack
+                    <select id="activeStylePack"></select>
+                  </label>
+                  <label>
+                    Continuity mode
+                    <select id="continuityMode">
+                      <option value="bridging">Bridging (first + last frame)</option>
+                      <option value="last-frame">Last-frame chaining</option>
+                      <option value="independent">Independent shots</option>
+                    </select>
+                  </label>
+                </div>
+                <button class="secondary" id="saveProjectSettings">Save Project Settings</button>
               </section>
 
               <section class="step-panel" data-step="1">
