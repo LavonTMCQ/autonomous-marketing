@@ -2,6 +2,7 @@ const state = {
   activeView: 'stepper',
   activeStep: 0,
   project: null,
+  projects: [],
   stylepacks: [],
   selectedStylePack: null,
 };
@@ -38,7 +39,8 @@ const renderSteps = () => {
   container.innerHTML = '';
   steps.forEach((label, index) => {
     const btn = document.createElement('button');
-    btn.className = `step ${index === state.activeStep ? 'active' : ''}`;
+    const isLocked = !state.project && index > 0;
+    btn.className = `step ${index === state.activeStep ? 'active' : ''} ${isLocked ? 'locked' : ''}`;
     btn.textContent = label;
     btn.addEventListener('click', () => setStep(index));
     container.appendChild(btn);
@@ -49,8 +51,9 @@ const setStep = (index) => {
   state.activeStep = index;
   renderSteps();
   qsa('.step-panel').forEach((panel) => {
-    panel.classList.toggle('active', parseInt(panel.dataset.step, 10) === index);
+    panel.classList.toggle('active', parseInt(panel.dataset.step, 10) === state.activeStep);
   });
+  qs('#projectGate').classList.toggle('active', !state.project && state.activeStep > 0);
 };
 
 const setView = (view) => {
@@ -64,7 +67,25 @@ const setView = (view) => {
 
 const updateProjectUI = () => {
   qs('#activeProject').textContent = state.project ? state.project.name : 'None';
-  qs('#projectStatus').textContent = state.project ? `Project ${state.project.id}` : 'No project yet';
+  qs('#activeProjectMeta').textContent = state.project
+    ? 'Autosave on · Changes are saved as you go.'
+    : 'Create a project to begin.';
+  qs('#projectStatus').textContent = state.project
+    ? `${state.project.name} · Autosave on`
+    : 'No project yet';
+};
+
+const refreshProjects = async () => {
+  const data = await api.get('/api/projects');
+  state.projects = data.projects || [];
+  const select = qs('#projectList');
+  select.innerHTML = '<option value="">Select a project</option>';
+  state.projects.forEach((project) => {
+    const option = document.createElement('option');
+    option.value = project.id;
+    option.textContent = project.name;
+    select.appendChild(option);
+  });
 };
 
 const refreshStylePacks = async () => {
@@ -162,7 +183,9 @@ const init = async () => {
   renderSteps();
   setStep(0);
   setView('stepper');
+  await refreshProjects();
   await refreshStylePacks();
+  updateProjectUI();
 };
 
 qsa('.nav-btn').forEach((btn) => {
@@ -178,6 +201,17 @@ qs('#createProject').addEventListener('click', async () => {
   };
   state.project = await api.post('/api/projects', payload);
   updateProjectUI();
+  await refreshProjects();
+  qs('#projectList').value = state.project.id;
+  setStep(state.activeStep);
+});
+
+qs('#openProject').addEventListener('click', async () => {
+  const projectId = qs('#projectList').value;
+  if (!projectId) return;
+  state.project = await api.get(`/api/projects/${projectId}`);
+  updateProjectUI();
+  setStep(1);
 });
 
 qs('#saveBrandKit').addEventListener('click', async () => {

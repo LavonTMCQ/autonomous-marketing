@@ -17,6 +17,7 @@
         <div class="project-summary">
           <h3>Active Project</h3>
           <p id="activeProject">None</p>
+          <p id="activeProjectMeta" class="project-meta">Create a project to begin.</p>
         </div>
       </aside>
       <main>
@@ -31,9 +32,23 @@
           <div class="stepper">
             <div class="steps" id="steps"></div>
             <div class="step-content">
+              <div id="projectGate" class="step-overlay">
+                <div>
+                  <h4>Create a project first</h4>
+                  <p>Start with Step 1 to unlock the rest of the pipeline.</p>
+                </div>
+              </div>
               <section class="step-panel" data-step="0">
                 <h3>1. New Project</h3>
                 <div class="grid">
+                  <label>
+                    Resume project
+                    <select id="projectList"></select>
+                    <span class="helper">Pick an existing project to continue where you left off.</span>
+                  </label>
+                  <div class="inline-actions">
+                    <button class="secondary" id="openProject">Open Project</button>
+                  </div>
                   <label>
                     Project name
                     <input id="projectName" type="text" placeholder="Launch video" />
@@ -57,6 +72,7 @@
                   <label>
                     Style Pack
                     <select id="stylePackSelect"></select>
+                    <span class="helper">Applies a visual reference pack to guide the look of the video.</span>
                   </label>
                 </div>
                 <button class="primary" id="createProject">Create Project</button>
@@ -128,6 +144,14 @@
 
               <section class="step-panel" data-step="4">
                 <h3>5. Generate Clips</h3>
+                <label>
+                  Continuity mode
+                  <select id="continuityMode">
+                    <option value="standard">Standard continuity</option>
+                    <option value="first-last">First + last frame bridging</option>
+                  </select>
+                  <span class="helper">Bridges the last frame of a shot into the next first frame for smoother cuts.</span>
+                </label>
                 <p>Use keyframes, continuity, and style pack references to generate clips.</p>
                 <button class="primary" id="generateClips">Generate Clips</button>
                 <div id="clipStatus" class="status-list"></div>
