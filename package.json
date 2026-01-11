@@ -1,0 +1,17 @@
+{
+  "name": "autonomous-marketing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local storyboard-driven marketing video generator with style packs.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.0.7",
+    "pngjs": "^7.0.0"
+  }
+}
