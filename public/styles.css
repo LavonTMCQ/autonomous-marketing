@@ -308,6 +308,53 @@ button.secondary {
   margin: 24px 0;
 }
 
+/* Cost display styles */
+.cost-summary {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  border-radius: 12px;
+  margin-top: auto;
+}
+
+.cost-summary h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.cost-row.total {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 8px;
+  padding-top: 8px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.cost-estimate {
+  background: #f0fdf4;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cost-estimate::before {
+  content: '$';
+  font-weight: 700;
+  color: #22c55e;
+}
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;

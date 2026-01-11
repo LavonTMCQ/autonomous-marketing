@@ -9,6 +9,11 @@ const {
   listProjects,
 } = require('./src/storage/projectStore');
 const {
+  estimateProjectCost,
+  getProviderInfo,
+  tracker,
+} = require('./src/utils/costs');
+const {
   createStylePack,
   listStylePacks,
   loadStylePack,
@@ -41,6 +46,29 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Cost estimation and provider info
+app.get('/api/costs/providers', (req, res) => {
+  res.json(getProviderInfo());
+});
+
+app.get('/api/costs/estimate', (req, res) => {
+  const {
+    shotCount = 4,
+    videoDuration = 4,
+    regenerations = 0,
+  } = req.query;
+  const estimate = estimateProjectCost({
+    shotCount: Number(shotCount),
+    videoDuration: Number(videoDuration),
+    regenerations: Number(regenerations),
+  });
+  res.json(estimate);
+});
+
+app.get('/api/costs/session', (req, res) => {
+  res.json(tracker.getSessionSummary());
+});
+
 app.get('/api/projects', (req, res) => {
   res.json({ projects: listProjects() });
 });
@@ -69,16 +97,27 @@ app.post('/api/projects/:id/brand-kit', (req, res) => {
   res.json(project);
 });
 
-app.post('/api/projects/:id/script', (req, res) => {
-  const project = loadProject(req.params.id);
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
+app.post('/api/projects/:id/script', async (req, res) => {
+  try {
+    const project = loadProject(req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    const { brief, raw_script } = req.body;
+    const result = await generateScriptSections({ brief, raw_script });
+    project.script = {
+      raw: result.raw,
+      sections: result.sections,
+      generated: result.generated,
+      provider: result.provider,
+      model: result.model,
+    };
+    saveProject(project);
+    res.json(project.script);
+  } catch (error) {
+    console.error('[Server] Script generation error:', error);
+    res.status(500).json({ error: error.message });
   }
-  const { brief, raw_script } = req.body;
-  const sections = generateScriptSections({ brief, raw_script });
-  project.script = { raw: sections.raw, sections: sections.sections };
-  saveProject(project);
-  res.json(project.script);
 });
 
 app.post('/api/projects/:id/storyboard', (req, res) => {

@@ -233,6 +233,44 @@ const updateExportStatus = () => {
   });
 };
 
+const formatCost = (cost) => {
+  if (cost === 0) return '$0.00';
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+};
+
+const updateSessionCosts = async () => {
+  try {
+    const session = await api.get('/api/costs/session');
+    qs('#costImages').textContent = formatCost(session.totals?.images || 0);
+    qs('#costVideos').textContent = formatCost(session.totals?.videos || 0);
+    qs('#costLLM').textContent = formatCost(session.totals?.llm || 0);
+    qs('#costTotal').textContent = formatCost(session.totals?.total || 0);
+  } catch (e) {
+    console.error('Failed to update session costs:', e);
+  }
+};
+
+const updateCostEstimates = async () => {
+  if (!state.project?.shots?.length) {
+    qs('#keyframeCostEstimate').textContent = 'Generate a storyboard first';
+    qs('#clipCostEstimate').textContent = 'Generate keyframes first';
+    return;
+  }
+
+  const shotCount = state.project.shots.length;
+  const avgDuration = state.project.shots.reduce((sum, s) => sum + (s.duration_sec || 4), 0) / shotCount;
+
+  try {
+    const estimate = await api.get(`/api/costs/estimate?shotCount=${shotCount}&videoDuration=${avgDuration}`);
+    qs('#keyframeCostEstimate').textContent = `Est. ${estimate.breakdown?.images?.formatted || '~$0.16'} for ${shotCount} keyframes (${estimate.breakdown?.images?.breakdown || ''})`;
+    qs('#clipCostEstimate').textContent = `Est. ${estimate.breakdown?.videos?.formatted || '~$2.40'} for ${shotCount} clips (${estimate.breakdown?.videos?.perVideo?.breakdown || ''})`;
+  } catch (e) {
+    qs('#keyframeCostEstimate').textContent = `Est. ~$${(shotCount * 0.04).toFixed(2)} for ${shotCount} keyframes`;
+    qs('#clipCostEstimate').textContent = `Est. ~$${(shotCount * 0.60).toFixed(2)} for ${shotCount} clips`;
+  }
+};
+
 const init = async () => {
   renderSteps();
   setStep(0);
@@ -240,6 +278,8 @@ const init = async () => {
   await refreshProjects();
   await refreshStylePacks();
   updateProjectUI();
+  updateSessionCosts();
+  updateCostEstimates();
 };
 
 qsa('.nav-btn').forEach((btn) => {
@@ -268,6 +308,7 @@ qs('#openProject').addEventListener('click', async () => {
   state.project = await api.get(`/api/projects/${projectId}`);
   updateProjectUI();
   syncProjectSettingsUI();
+  updateCostEstimates();
   setStep(1);
 });
 
@@ -308,6 +349,7 @@ qs('#generateScript').addEventListener('click', async () => {
   qs('#scriptProblem').value = script.sections.problem || '';
   qs('#scriptSolution').value = script.sections.solution || '';
   qs('#scriptCta').value = script.sections.cta || '';
+  updateSessionCosts();
 });
 
 qs('#generateStoryboard').addEventListener('click', async () => {
@@ -315,6 +357,7 @@ qs('#generateStoryboard').addEventListener('click', async () => {
   const result = await api.post(`/api/projects/${state.project.id}/storyboard`, {});
   state.project.shots = result.shots;
   renderShotTable();
+  updateCostEstimates();
 });
 
 qs('#generateKeyframes').addEventListener('click', async () => {
@@ -322,6 +365,7 @@ qs('#generateKeyframes').addEventListener('click', async () => {
   const result = await api.post(`/api/projects/${state.project.id}/keyframes`, {});
   state.project.shots = result.shots;
   renderShotTable();
+  updateSessionCosts();
 });
 
 qs('#generateClips').addEventListener('click', async () => {
@@ -330,6 +374,7 @@ qs('#generateClips').addEventListener('click', async () => {
   state.project.shots = result.shots;
   updateClipStatus();
   renderShotTable();
+  updateSessionCosts();
 });
 
 qs('#exportVideo').addEventListener('click', async () => {
@@ -354,16 +399,19 @@ qs('#shotTable').addEventListener('click', async (event) => {
       mode: 'keyframe',
     });
     state.project = result.project;
+    updateSessionCosts();
   } else if (action === 'regen-clip') {
     const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/regenerate`, {
       mode: 'clip',
     });
     state.project = result.project;
+    updateSessionCosts();
   } else if (action === 'regen-both') {
     const result = await api.post(`/api/projects/${state.project.id}/shots/${shotId}/regenerate`, {
       mode: 'both',
     });
     state.project = result.project;
+    updateSessionCosts();
   } else if (action === 'rollback-keyframe' || action === 'rollback-clip') {
     const asset = action === 'rollback-keyframe' ? 'keyframe' : 'clip';
     const select = qs(`select[data-asset="${asset}"][data-shot="${shotId}"]`);

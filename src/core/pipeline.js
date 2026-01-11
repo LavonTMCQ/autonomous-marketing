@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { ImageProvider } = require('../providers/imageProvider');
 const { VideoProvider } = require('../providers/videoProvider');
+const { LLMProvider } = require('../providers/llmProvider');
 const { ContinuityManager } = require('./continuity');
 const { loadStylePack } = require('../storage/stylePackStore');
 const { ensureProjectDirs } = require('../storage/projectStore');
@@ -101,18 +102,61 @@ const cacheStylePackRefs = (projectId, stylePack, refs) => {
   });
 };
 
-const generateScriptSections = ({ brief, raw_script }) => {
+const generateScriptSections = async ({ brief, raw_script, useLLM = true }) => {
+  // If raw script provided, just parse it
   if (raw_script) {
     return {
       raw: raw_script,
       sections: splitScriptSections(raw_script),
+      generated: false,
     };
   }
-  const seed = brief || 'Introduce the product, highlight the problem, show the solution, and finish with a CTA.';
-  const raw = `Hook: ${seed}\nProblem: The audience struggles with the current workflow.\nSolution: Show how the product solves it with clarity and speed.\nCTA: Invite them to try it today.`;
+
+  // If no brief, use placeholder
+  if (!brief) {
+    const seed = 'Introduce the product, highlight the problem, show the solution, and finish with a CTA.';
+    const raw = `Hook: ${seed}\nProblem: The audience struggles with the current workflow.\nSolution: Show how the product solves it with clarity and speed.\nCTA: Invite them to try it today.`;
+    return {
+      raw,
+      sections: splitScriptSections(raw),
+      generated: false,
+    };
+  }
+
+  // Use LLM to generate script from brief
+  if (useLLM) {
+    try {
+      const llm = new LLMProvider();
+      console.log('[Pipeline] Generating script with LLM...');
+      const result = await llm.generateScript(brief);
+
+      // Format as raw script for storage
+      const raw = `Hook: ${result.hook}\nProblem: ${result.problem}\nSolution: ${result.solution}\nCTA: ${result.cta}`;
+
+      return {
+        raw,
+        sections: {
+          hook: result.hook,
+          problem: result.problem,
+          solution: result.solution,
+          cta: result.cta,
+        },
+        generated: true,
+        provider: result.provider,
+        model: result.model,
+      };
+    } catch (error) {
+      console.error('[Pipeline] LLM script generation failed:', error.message);
+      // Fall through to placeholder
+    }
+  }
+
+  // Fallback to simple placeholder
+  const raw = `Hook: ${brief}\nProblem: The audience faces challenges that need solving.\nSolution: Here's how this product makes things better.\nCTA: Get started today!`;
   return {
     raw,
     sections: splitScriptSections(raw),
+    generated: false,
   };
 };
 

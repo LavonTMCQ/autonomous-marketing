@@ -19,6 +19,15 @@
           <p id="activeProject">None</p>
           <p id="activeProjectMeta" class="project-meta">Create a project to begin.</p>
         </div>
+        <div class="cost-summary">
+          <h3>Session Costs</h3>
+          <div id="sessionCosts">
+            <div class="cost-row"><span>Images:</span><span id="costImages">$0.00</span></div>
+            <div class="cost-row"><span>Videos:</span><span id="costVideos">$0.00</span></div>
+            <div class="cost-row"><span>LLM:</span><span id="costLLM">$0.00</span></div>
+            <div class="cost-row total"><span>Total:</span><span id="costTotal">$0.00</span></div>
+          </div>
+        </div>
       </aside>
       <main>
         <section id="stepperView" class="view active">
@@ -156,12 +165,18 @@
                 <h3>4. Storyboard</h3>
                 <button class="secondary" id="generateStoryboard">Generate Shot List</button>
                 <div class="table" id="shotTable"></div>
+                <div class="cost-estimate">
+                  <span id="keyframeCostEstimate">Est. cost: calculating...</span>
+                </div>
                 <button class="primary" id="generateKeyframes">Generate Keyframes</button>
               </section>
 
               <section class="step-panel" data-step="4">
                 <h3>5. Generate Clips</h3>
                 <p>Use keyframes, continuity, and style pack references to generate clips.</p>
+                <div class="cost-estimate">
+                  <span id="clipCostEstimate">Est. cost: calculating...</span>
+                </div>
                 <button class="primary" id="generateClips">Generate Clips</button>
                 <div id="clipStatus" class="status-list"></div>
               </section>
