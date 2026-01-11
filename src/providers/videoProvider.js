@@ -237,8 +237,9 @@ class VideoProvider {
       console.log('[VideoProvider] Added first frame to request');
     }
 
-    // Add last frame for interpolation (Veo 3.1 feature!)
-    if (lastFramePath && fs.existsSync(lastFramePath)) {
+    // Add last frame for interpolation (Veo 3.1 only - not supported in 3.0)
+    const supportsLastFrame = this.veoModel.includes('3.1');
+    if (supportsLastFrame && lastFramePath && fs.existsSync(lastFramePath)) {
       const imageData = fs.readFileSync(lastFramePath);
       const base64Image = imageData.toString('base64');
       const mimeType = lastFramePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -248,11 +249,13 @@ class VideoProvider {
         mimeType: mimeType,
       };
       console.log('[VideoProvider] Added last frame for interpolation (bridging mode)');
+    } else if (lastFramePath && !supportsLastFrame) {
+      console.log('[VideoProvider] Skipping lastFrame (not supported by ' + this.veoModel + ')');
     }
 
     const parameters = {
       aspectRatio: aspectRatio.replace(':', ':'),
-      durationSeconds: String(durationSec || this.veoDuration),
+      durationSeconds: Number(durationSec) || Number(this.veoDuration) || 4,
     };
 
     // Add negative prompt if provided
